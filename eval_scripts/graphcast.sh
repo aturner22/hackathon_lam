@@ -1,7 +1,7 @@
 python train_model.py\
-    --dataset meps_example\
+    --dataset meps_online\
     --model graphcast\
-    --n_example_pred 0\
+    --n_example_pred 1\
     --graph multiscale\
     --n_workers 11\
     --hidden_dim 128\
@@ -10,4 +10,4 @@ python train_model.py\
     --batch_size 1\
     --load paper_checkpoints/graphcast.ckpt\
     --eval test\
-    --pred_steps 2\
+    --pred_steps 5\

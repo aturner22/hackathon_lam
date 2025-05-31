@@ -279,33 +279,35 @@ def main():
     seed.seed_everything(args.seed)
 
     # Load data
-    train_loader = torch.utils.data.DataLoader(
-        WeatherDataset(
-            args.dataset,
-            pred_length=args.ar_steps,
-            split="train",
-            subsample_step=args.step_length,
-            subset=bool(args.subset_ds),
-            control_only=args.control_only,
-        ),
-        args.batch_size,
-        shuffle=True,
-        num_workers=args.n_workers,
-    )
-    max_pred_length = (65 // args.step_length) - 2  # 19
-    val_loader = torch.utils.data.DataLoader(
-        WeatherDataset(
-            args.dataset,
-            pred_length=max_pred_length,
-            split="val",
-            subsample_step=args.step_length,
-            subset=bool(args.subset_ds),
-            control_only=args.control_only,
-        ),
-        args.batch_size,
-        shuffle=False,
-        num_workers=args.n_workers,
-    )
+    # Only create train/val loaders if not running in eval mode
+    if not args.eval:
+        train_loader = torch.utils.data.DataLoader(
+            WeatherDataset(
+                args.dataset,
+                pred_length=args.ar_steps,
+                split="train",
+                subsample_step=args.step_length,
+                subset=bool(args.subset_ds),
+                control_only=args.control_only,
+            ),
+            args.batch_size,
+            shuffle=True,
+            num_workers=args.n_workers,
+        )
+        max_pred_length = (65 // args.step_length) - 2  # 19
+        val_loader = torch.utils.data.DataLoader(
+            WeatherDataset(
+                args.dataset,
+                pred_length=max_pred_length,
+                split="val",
+                subsample_step=args.step_length,
+                subset=bool(args.subset_ds),
+                control_only=args.control_only,
+            ),
+            args.batch_size,
+            shuffle=False,
+            num_workers=args.n_workers,
+        )
 
     # Instantiate model + trainer
     if torch.cuda.is_available():
