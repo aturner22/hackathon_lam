@@ -253,6 +253,14 @@ def main():
         default=5,
         help="Number of ensemble members during evaluation (default: 5)",
     )
+    parser.add_argument(
+    "--pred_steps",
+    type=int,
+    default=19,
+    choices=range(1, 20),
+    metavar="[1-19]",
+    help="Number of steps to predict forward during evaluation (default: 1, min: 1, max: 19)",
+)
     args = parser.parse_args()
 
     # Asserts for arguments
@@ -311,7 +319,7 @@ def main():
     # Load model parameters Use new args for model
     model_class = MODELS[args.model]
     if args.load:
-        model = model_class.load_from_checkpoint(args.load, args=args)
+        model = model_class.load_from_checkpoint(args.load, map_location=torch.device('cpu'), args=args)
         if args.restore_opt:
             # Save for later
             # Unclear if this works for multi-GPU
@@ -381,7 +389,7 @@ def main():
             eval_loader = torch.utils.data.DataLoader(
                 WeatherDataset(
                     args.dataset,
-                    pred_length=max_pred_length,
+                    pred_length=args.pred_steps,  # Use the CLI argument
                     split="test",
                     subsample_step=args.step_length,
                     subset=bool(args.subset_ds),

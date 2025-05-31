@@ -1,3 +1,6 @@
+env
+sandbox.ipynb
+
 ### Project Specific ###
 wandb
 slurm_log*
