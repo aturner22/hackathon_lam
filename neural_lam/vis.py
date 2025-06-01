@@ -224,7 +224,7 @@ def plot_on_axis(ax, data, alpha=None, vmin=None, vmax=None, ax_title=None):
 
 
 @matplotlib.rc_context(utils.fractional_plot_bundle(1))
-def plot_spatial_error(error, obs_mask, title=None, vrange=None):
+def plot_spatial_error(error, obs_mask, title=None, vrange=None, raw=False):
     """
     Plot errors over spatial map
     Error and obs_mask has shape (N_grid,)
@@ -233,6 +233,9 @@ def plot_spatial_error(error, obs_mask, title=None, vrange=None):
     if vrange is None:
         vmin = error.min().cpu().item()
         vmax = error.max().cpu().item()
+        if raw:
+            abs_max = max(abs(vmin), abs(vmax))
+            vmin, vmax = -abs_max, abs_max
     else:
         vmin, vmax = vrange
 
@@ -249,6 +252,10 @@ def plot_spatial_error(error, obs_mask, title=None, vrange=None):
     ax.coastlines()  # Add coastline outlines
     error_grid = error.reshape(*constants.GRID_SHAPE).cpu().numpy()
 
+    cmap = "OrRd"
+    if raw:
+        cmap = "bwr"  # blue-white-red for raw error
+
     im = ax.imshow(
         error_grid,
         origin="lower",
@@ -256,7 +263,7 @@ def plot_spatial_error(error, obs_mask, title=None, vrange=None):
         alpha=pixel_alpha,
         vmin=vmin,
         vmax=vmax,
-        cmap="OrRd",
+        cmap=cmap,
     )
 
     # Ticks and labels
