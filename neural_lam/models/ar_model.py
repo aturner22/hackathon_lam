@@ -597,7 +597,14 @@ class ARModel(pl.LightningModule):
             NP_SAVE_DIR = "output/error_maps/"
             os.makedirs(NP_SAVE_DIR, exist_ok=True)
             np.save(os.path.join(NP_SAVE_DIR, "mean_raw_error.npy"), mean_raw_error.cpu().numpy())
-
+            vranges = {}
+            for var_i in range(mean_raw_error.shape[2]):
+                var_data = mean_raw_error[:, :, var_i]  # shape: (pred_steps, num_grid_nodes)
+                vmin = var_data.min()
+                vmax = var_data.max()
+                abs_max = max(abs(vmin), abs(vmax))
+                vmin, vmax = -abs_max, abs_max
+                vranges[var_i] = (vmin, vmax)
             for t_i in range(mean_raw_error.shape[0]):  # pred_steps
                 for var_i in range(mean_raw_error.shape[2]):  # d_f
                     error_map = mean_raw_error[t_i, :, var_i]  # (num_grid_nodes,)
@@ -608,6 +615,7 @@ class ARModel(pl.LightningModule):
                         error_map,
                         self.interior_mask[:, 0],
                         title=f"{var_name} raw error, t={t_i+1} ({self.step_length*(t_i+1)} h)",
+                        vrange=vranges[var_i],
                         raw=True
                     )
                     # fig.savefig(os.path.join(var_dir, f"raw_error_t{t_i+1}.pdf"))
@@ -633,7 +641,14 @@ class ARModel(pl.LightningModule):
                 
                 diff = mean_raw_error.cpu().numpy() - baseline_raw_error
                 diff = torch.from_numpy(diff)  # (pred_steps, num_grid_nodes, d_f)
-
+                vranges = {}
+                for var_i in range(diff.shape[2]):
+                    var_data = diff[:, :, var_i]  # shape: (pred_steps, num_grid_nodes)
+                    vmin = var_data.min()
+                    vmax = var_data.max()
+                    abs_max = max(abs(vmin), abs(vmax))
+                    vmin, vmax = -abs_max, abs_max
+                    vranges[var_i] = (vmin, vmax)
                 for t_i in range(diff.shape[0]):  # pred_steps
                     for var_i in range(diff.shape[2]):  # d_f
                         error_map = diff[t_i, :, var_i]  # (num_grid_nodes,)
@@ -644,6 +659,7 @@ class ARModel(pl.LightningModule):
                             error_map,
                             self.interior_mask[:, 0],
                             title=f"{var_name} raw error, t={t_i+1} ({self.step_length*(t_i+1)} h)",
+                            vrange=vranges[var_i],
                             raw=True,
                         )
                         # fig.savefig(os.path.join(var_dir, f"raw_error_t{t_i+1}.pdf"))
