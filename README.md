@@ -76,6 +76,7 @@ You will have to adjust the `CUDA` variable to match the CUDA version on your sy
 ## Data
 Datasets should be stored in a directory called `data`.
 See the [repository format section](#format-of-data-directory) for details on the directory structure.
+For detailed information on data loading, supported formats, and the `WeatherDataset` class (including configuration for `.npy`, `.grib`, and `.nc` files), please see our [Data Handling Documentation](docs/data_handling.md).
 
 The full MEPS dataset is available for download [here](https://nextcloud.liu.se/s/meps). See instructions in the file `README.txt` for how to download and extract the full dataset.
 
