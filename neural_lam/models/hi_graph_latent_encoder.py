@@ -2,7 +2,7 @@
 from torch import nn
 
 # First-party
-from neural_lam import utils
+from neural_lam.utils import utils as project_utils
 from neural_lam.interaction_net import PropagationNet
 from neural_lam.models.base_latent_encoder import BaseLatentEncoder
 
@@ -55,7 +55,7 @@ class HiGraphLatentEncoder(BaseLatentEncoder):
         # Identity mappings if intra_level_layers = 0
         self.intra_level_gnns = nn.ModuleList(
             [
-                utils.make_gnn_seq(
+                project_utils.make_gnn_seq(
                     edge_index, intra_level_layers, hidden_layers, hidden_dim
                 )
                 for edge_index in m2m_edge_index
@@ -63,7 +63,7 @@ class HiGraphLatentEncoder(BaseLatentEncoder):
         )
 
         # Final map to parameters
-        self.latent_param_map = utils.make_mlp(
+        self.latent_param_map = project_utils.make_mlp(
             [hidden_dim] * (hidden_layers + 1) + [self.output_dim],
             layer_norm=False,
         )

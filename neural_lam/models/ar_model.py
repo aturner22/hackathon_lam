@@ -9,10 +9,14 @@ import torch
 import wandb
 
 # First-party
-from neural_lam import constants, metrics, utils, vis
+from neural_lam.configs import constants
+from neural_lam import metrics # metrics.py is in neural_lam/ not neural_lam/utils/
+from neural_lam.utils import utils as project_utils
+from neural_lam import vis # vis.py is in neural_lam/ not neural_lam/utils/
+from neural_lam.models.base import BaseModel
 
 
-class ARModel(pl.LightningModule):
+class ARModel(BaseModel):
     """
     Generic auto-regressive weather model.
     Abstract class that can be extended.
@@ -21,20 +25,28 @@ class ARModel(pl.LightningModule):
     # pylint: disable=arguments-differ
     # Disable to override args/kwargs from superclass
 
-    def __init__(self, args):
+    def __init__(self, model_cfg, training_cfg, data_cfg):
         super().__init__()
-        self.save_hyperparameters()
-        self.lr = args.lr
+        # It's good practice to save hyperparameters for clarity and reproducibility
+        # self.save_hyperparameters() #ദീ This might save too much if cfg objects are complex.
+        # Instead, we can selectively save what's needed or log the whole config with WandB.
+
+        self.model_cfg = model_cfg
+        self.training_cfg = training_cfg
+        self.data_cfg = data_cfg
+
+        self.lr = training_cfg.lr # From training_cfg
 
         # Load static features for grid/data
-        static_data_dict = utils.load_static_data(args.dataset)
+        # Assuming data_cfg.dataset_name holds the dataset identifier
+        static_data_dict = project_utils.load_static_data(data_cfg.dataset_name)
         for static_data_name, static_data_tensor in static_data_dict.items():
             self.register_buffer(
                 static_data_name, static_data_tensor, persistent=False
             )
 
         # Double grid output dim. to also output std.-dev.
-        self.output_std = bool(args.output_std)
+        self.output_std = bool(model_cfg.output_std) # From model_cfg
         if self.output_std:
             self.grid_output_dim = (
                 2 * constants.GRID_STATE_DIM
@@ -49,7 +61,7 @@ class ARModel(pl.LightningModule):
             # in wMSE/wMAE
             self.register_buffer(
                 "per_var_std",
-                self.step_diff_std / torch.sqrt(self.param_weights),
+                self.step_diff_std / torch.sqrt(self.param_weights), # These buffers come from static_data_dict
                 persistent=False,
             )
 
@@ -65,14 +77,14 @@ class ARModel(pl.LightningModule):
         )
 
         # Instantiate loss function
-        self.loss = metrics.get_metric(args.loss)
+        self.loss = metrics.get_metric(training_cfg.loss_func) # From training_cfg
 
         # Pre-compute interior mask for use in loss function
         self.register_buffer(
             "interior_mask", 1.0 - self.border_mask, persistent=False
         )  # (num_grid_nodes, 1), 1 for non-border
 
-        self.step_length = args.step_length  # Number of hours per pred. step
+        self.step_length = data_cfg.subsample_step  # Number of hours per pred. step, from data_cfg
         self.val_metrics = {
             "mse": [],
         }
@@ -84,22 +96,23 @@ class ARModel(pl.LightningModule):
             self.test_metrics["output_std"] = []  # Treat as metric
 
         # For making restoring of optimizer state optional (slight hack)
-        self.opt_state = None
+        self.opt_state = None # This might be handled differently with PL and Hydra
 
         # For example plotting
-        self.n_example_pred = args.n_example_pred
+        self.n_example_pred = training_cfg.n_example_pred # From training_cfg
         self.plotted_examples = 0
 
         # For storing spatial loss maps during evaluation
         self.spatial_loss_maps = []
 
     def configure_optimizers(self):
+        # Access optimizer params from training_cfg
         opt = torch.optim.AdamW(
-            self.parameters(), lr=self.lr, betas=(0.9, 0.95)
+            self.parameters(), lr=self.lr, betas=list(self.training_cfg.betas) # Ensure betas is a list
         )
-        if self.opt_state:
-            opt.load_state_dict(self.opt_state)
-
+        # Optimizer state restoration is usually handled by PyTorch Lightning checkpointing
+        # if self.opt_state:
+        #     opt.load_state_dict(self.opt_state)
         return opt
 
     @property
@@ -197,7 +210,7 @@ class ARModel(pl.LightningModule):
 
         return prediction, target_states, pred_std
 
-    def training_step(self, batch):
+    def training_step(self, batch, batch_idx: int = 0):
         """
         Train on single batch
         """
@@ -227,9 +240,7 @@ class ARModel(pl.LightningModule):
         """
         return self.all_gather(tensor_to_gather).flatten(0, 1)
 
-    # newer lightning versions requires batch_idx argument, even if unused
-    # pylint: disable-next=unused-argument
-    def validation_step(self, batch, batch_idx):
+    def validation_step(self, batch, batch_idx: int = 0):
         """
         Run validation on single batch
         """
@@ -274,8 +285,7 @@ class ARModel(pl.LightningModule):
         for metric_list in self.val_metrics.values():
             metric_list.clear()
 
-    # pylint: disable-next=unused-argument
-    def test_step(self, batch, batch_idx):
+    def test_step(self, batch, batch_idx: int = 0):
         """
         Run test on single batch
         """
@@ -601,3 +611,12 @@ class ARModel(pl.LightningModule):
                 )
                 loaded_state_dict[new_key] = loaded_state_dict[old_key]
                 del loaded_state_dict[old_key]
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # This model uses predict_step for its core logic,
+        # which is called by unroll_prediction.
+        # The `forward` method is not directly used in the same way here.
+        # Depending on how `BaseModel` is used, this might need adjustment.
+        # For now, raising NotImplementedError to indicate it needs specific implementation
+        # if called directly.
+        raise NotImplementedError("Forward pass is handled by unroll_prediction.")

@@ -13,26 +13,30 @@ class GraphFM(BaseHiGraphModel):
     and up the hierarchy during processing.
     """
 
-    def __init__(self, args):
-        super().__init__(args)
+    def __init__(self, model_cfg, training_cfg, data_cfg): # Updated signature
+        super().__init__(model_cfg, training_cfg, data_cfg) # Pass cfgs to parent
+
+        # processor_layers from model_cfg (as it's a model architecture detail)
+        # It was originally ARModel's args.processor_layers
+        num_processor_steps = model_cfg.processor_layers
 
         # Make down GNNs, both for down edges and same level
         self.mesh_down_gnns = nn.ModuleList(
-            [self.make_down_gnns(args) for _ in range(args.processor_layers)]
+            [self.make_down_gnns(model_cfg) for _ in range(num_processor_steps)]
         )  # Nested lists (proc_steps, num_levels-1)
         self.mesh_down_same_gnns = nn.ModuleList(
-            [self.make_same_gnns(args) for _ in range(args.processor_layers)]
+            [self.make_same_gnns(model_cfg) for _ in range(num_processor_steps)]
         )  # Nested lists (proc_steps, num_levels)
 
         # Make up GNNs, both for up edges and same level
         self.mesh_up_gnns = nn.ModuleList(
-            [self.make_up_gnns(args) for _ in range(args.processor_layers)]
+            [self.make_up_gnns(model_cfg) for _ in range(num_processor_steps)]
         )  # Nested lists (proc_steps, num_levels-1)
         self.mesh_up_same_gnns = nn.ModuleList(
-            [self.make_same_gnns(args) for _ in range(args.processor_layers)]
+            [self.make_same_gnns(model_cfg) for _ in range(num_processor_steps)]
         )  # Nested lists (proc_steps, num_levels)
 
-    def make_same_gnns(self, args):
+    def make_same_gnns(self, model_cfg): # Takes model_cfg
         """
         Make intra-level GNNs.
         """
@@ -40,30 +44,30 @@ class GraphFM(BaseHiGraphModel):
             [
                 InteractionNet(
                     edge_index,
-                    args.hidden_dim,
-                    hidden_layers=args.hidden_layers,
+                    model_cfg.hidden_dim,
+                    hidden_layers=model_cfg.hidden_layers,
                 )
                 for edge_index in self.m2m_edge_index
             ]
         )
 
-    def make_up_gnns(self, args):
+    def make_up_gnns(self, model_cfg): # Takes model_cfg
         """
         Make GNNs for processing steps up through the hierarchy.
         """
-        gnn_class = PropagationNet if args.vertical_propnets else InteractionNet
+        gnn_class = PropagationNet if model_cfg.vertical_propnets else InteractionNet
         return nn.ModuleList(
             [
                 gnn_class(
                     edge_index,
-                    args.hidden_dim,
-                    hidden_layers=args.hidden_layers,
+                    model_cfg.hidden_dim,
+                    hidden_layers=model_cfg.hidden_layers,
                 )
                 for edge_index in self.mesh_up_edge_index
             ]
         )
 
-    def make_down_gnns(self, args):
+    def make_down_gnns(self, model_cfg): # Takes model_cfg
         """
         Make GNNs for processing steps down through the hierarchy.
         """
@@ -71,8 +75,8 @@ class GraphFM(BaseHiGraphModel):
             [
                 InteractionNet(
                     edge_index,
-                    args.hidden_dim,
-                    hidden_layers=args.hidden_layers,
+                    model_cfg.hidden_dim,
+                    hidden_layers=model_cfg.hidden_layers,
                 )
                 for edge_index in self.mesh_down_edge_index
             ]

@@ -2,7 +2,8 @@
 from torch import nn
 
 # First-party
-from neural_lam import constants, utils
+from neural_lam.configs import constants
+from neural_lam.utils import utils as project_utils
 
 
 class BaseGraphLatentDecoder(nn.Module):
@@ -20,12 +21,12 @@ class BaseGraphLatentDecoder(nn.Module):
         super().__init__()
 
         # MLP for residual mapping of grid rep.
-        self.grid_update_mlp = utils.make_mlp(
+        self.grid_update_mlp = project_utils.make_mlp(
             [hidden_dim] * (hidden_layers + 2)
         )
 
         # Embedder for latent variable
-        self.latent_embedder = utils.make_mlp(
+        self.latent_embedder = project_utils.make_mlp(
             [latent_dim] + [hidden_dim] * (hidden_layers + 1)
         )
 
@@ -38,7 +39,7 @@ class BaseGraphLatentDecoder(nn.Module):
             output_dim = constants.GRID_STATE_DIM
 
         # Mapping to parameters of state distribution
-        self.param_map = utils.make_mlp(
+        self.param_map = project_utils.make_mlp(
             [hidden_dim] * (hidden_layers + 1) + [output_dim], layer_norm=False
         )
 

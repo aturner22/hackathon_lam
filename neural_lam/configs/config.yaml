@@ -1,0 +1,27 @@
+defaults:
+  - model: graphcast
+  - data: weather
+  - training: default
+
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
+
+# General experiment parameters
+seed: 42
+project_name: "neural_lam"
+notes: "" # Optional notes for the run
+resume_run_id: "" # Wandb run_id to resume, e.g. "neural_lam/abcdef"
+
+# Override with "test" for short test run
+run_mode: "train" # train, test, debug
+# Override with e.g. "+model.param=X"
+# Override with e.g. "model=other_model" to use configs/model/other_model.yaml
+
+# Parameters for specific parts of the project are in sub-configs
+# model: defined in configs/model/
+# data: defined in configs/data/
+# training: defined in configs/training/

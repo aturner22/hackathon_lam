@@ -1,0 +1,10 @@
+# Parameters for the GraphCast model (or ARModel as its parent)
+name: "graphcast" # or other model names like "graph_efm", "graph_fm"
+hidden_dim: 256
+processor_layers: 10
+output_std: False # Whether to output standard deviation
+# Add other model-specific parameters here
+# e.g. for GraphCast, specific GNN parameters like:
+# mesh_gnn_hidden_dim: 128
+# grid_gnn_hidden_dim: 128
+# etc.

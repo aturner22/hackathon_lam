@@ -4,7 +4,7 @@ import torch_geometric as pyg
 from torch import nn
 
 # First-party
-from neural_lam import utils
+from neural_lam.utils import utils as project_utils
 
 
 class InteractionNet(pyg.nn.MessagePassing):
@@ -66,18 +66,18 @@ class InteractionNet(pyg.nn.MessagePassing):
         aggr_mlp_recipe = [2 * input_dim] + [hidden_dim] * (hidden_layers + 1)
 
         if edge_chunk_sizes is None:
-            self.edge_mlp = utils.make_mlp(edge_mlp_recipe)
+            self.edge_mlp = project_utils.make_mlp(edge_mlp_recipe)
         else:
             self.edge_mlp = SplitMLPs(
-                [utils.make_mlp(edge_mlp_recipe) for _ in edge_chunk_sizes],
+                [project_utils.make_mlp(edge_mlp_recipe) for _ in edge_chunk_sizes],
                 edge_chunk_sizes,
             )
 
         if aggr_chunk_sizes is None:
-            self.aggr_mlp = utils.make_mlp(aggr_mlp_recipe)
+            self.aggr_mlp = project_utils.make_mlp(aggr_mlp_recipe)
         else:
             self.aggr_mlp = SplitMLPs(
-                [utils.make_mlp(aggr_mlp_recipe) for _ in aggr_chunk_sizes],
+                [project_utils.make_mlp(aggr_mlp_recipe) for _ in aggr_chunk_sizes],
                 aggr_chunk_sizes,
             )
 

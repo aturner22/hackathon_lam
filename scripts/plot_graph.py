@@ -7,7 +7,7 @@ import plotly.graph_objects as go
 import torch_geometric as pyg
 
 # First-party
-from neural_lam import utils
+from neural_lam.utils import utils as project_utils
 
 MESH_HEIGHT = 0.1
 MESH_LEVEL_DIST = 0.2
@@ -46,7 +46,7 @@ def main():
     args = parser.parse_args()
 
     # Load graph data
-    hierarchical, graph_ldict = utils.load_graph(args.graph)
+    hierarchical, graph_ldict = project_utils.load_graph(args.graph)
     (
         g2m_edge_index,
         m2g_edge_index,
@@ -62,7 +62,7 @@ def main():
     )
     mesh_static_features = graph_ldict["mesh_static_features"]
 
-    grid_static_features = utils.load_static_data(args.dataset)[
+    grid_static_features = project_utils.load_static_data(args.dataset)[
         "grid_static_features"
     ]
 

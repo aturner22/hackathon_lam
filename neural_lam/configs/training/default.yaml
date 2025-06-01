@@ -1,0 +1,36 @@
+# Parameters for training
+lr: 0.0005 # Learning rate
+epochs: 100
+ar_steps: 1 # Number of autoregressive steps during training, can be > 1 for unrolling
+loss_func: "wmse" # Weighted MSE, or "mse", "mae"
+output_std_loss_weight: 0.1 # Weight for std dev loss if model.output_std is True
+
+# Optimizer settings (AdamW is used in ARModel)
+betas: [0.9, 0.95]
+weight_decay: 0.1 # If using AdamW style weight decay
+
+# Scheduler settings (example: StepLR, not currently in ARModel but common)
+# scheduler:
+#   name: "StepLR"
+#   step_size: 30
+#   gamma: 0.1
+
+# Validation / Logging
+val_check_interval: 1.0 # How often to run validation (1.0 = every epoch)
+n_example_pred: 3 # Number of example predictions to plot during validation/testing
+log_every_n_steps: 50 # How often to log within an epoch
+
+# Checkpointing
+save_top_k: 1
+monitor_metric: "val_mean_loss" # Metric to monitor for saving best checkpoint
+mode: "min" # "min" or "max" for monitor_metric
+
+# Early stopping (optional)
+# early_stopping_patience: 10
+# early_stopping_metric: "val_mean_loss"
+
+# PL Trainer settings
+gpus: 1 # Number of GPUs to use, or [0,1] for specific GPUs, or -1 for all available
+precision: 16 # 16 for mixed precision, 32 for full precision
+max_steps: -1 # Limit number of training steps (useful for debugging)
+accumulate_grad_batches: 1 # Accumulate gradients over N batches

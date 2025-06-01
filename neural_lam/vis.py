@@ -5,10 +5,11 @@ import numpy as np
 import torch
 
 # First-party
-from neural_lam import constants, utils
+from neural_lam.configs import constants
+from neural_lam.utils import utils as project_utils
 
 
-@matplotlib.rc_context(utils.fractional_plot_bundle(1))
+@matplotlib.rc_context(project_utils.fractional_plot_bundle(1))
 def plot_error_map(errors, title=None, step_length=3):
     """
     Plot a heatmap of errors of different variables at different
@@ -63,7 +64,7 @@ def plot_error_map(errors, title=None, step_length=3):
     return fig
 
 
-@matplotlib.rc_context(utils.fractional_plot_bundle(1))
+@matplotlib.rc_context(project_utils.fractional_plot_bundle(1))
 def plot_prediction(pred, target, obs_mask, title=None, vrange=None):
     """
     Plot example prediction and grond truth.
@@ -112,7 +113,7 @@ def plot_prediction(pred, target, obs_mask, title=None, vrange=None):
     return fig
 
 
-@matplotlib.rc_context(utils.fractional_plot_bundle(1))
+@matplotlib.rc_context(project_utils.fractional_plot_bundle(1))
 def plot_ensemble_prediction(
     samples, target, ens_mean, ens_std, obs_mask, title=None, vrange=None
 ):
@@ -223,7 +224,7 @@ def plot_on_axis(ax, data, alpha=None, vmin=None, vmax=None, ax_title=None):
     return im
 
 
-@matplotlib.rc_context(utils.fractional_plot_bundle(1))
+@matplotlib.rc_context(project_utils.fractional_plot_bundle(1))
 def plot_spatial_error(error, obs_mask, title=None, vrange=None):
     """
     Plot errors over spatial map
@@ -271,7 +272,7 @@ def plot_spatial_error(error, obs_mask, title=None, vrange=None):
     return fig
 
 
-@matplotlib.rc_context(utils.fractional_plot_bundle(1))
+@matplotlib.rc_context(project_utils.fractional_plot_bundle(1))
 def plot_latent_samples(prior_samples, vi_samples, title=None):
     """
     Plot samples of latent variable drawn from prior and

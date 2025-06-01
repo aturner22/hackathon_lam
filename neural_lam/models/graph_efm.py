@@ -5,7 +5,10 @@ import torch
 import wandb
 
 # First-party
-from neural_lam import constants, metrics, utils, vis
+from neural_lam.configs import constants
+from neural_lam import metrics # Correct
+from neural_lam.utils import utils as project_utils # Updated
+from neural_lam import vis # Correct
 from neural_lam.models.ar_model import ARModel
 from neural_lam.models.constant_latent_encoder import ConstantLatentEncoder
 from neural_lam.models.graph_latent_decoder import GraphLatentDecoder
@@ -19,19 +22,27 @@ class GraphEFM(ARModel):
     Graph-based Ensemble Forecasting Model
     """
 
-    def __init__(self, args):
-        super().__init__(args)
+    def __init__(self, model_cfg, training_cfg, data_cfg): # Updated signature
+        super().__init__(model_cfg, training_cfg, data_cfg) # Pass cfgs to parent
 
+        # Accessing batch_size from data_cfg now, n_example_pred from training_cfg
         assert (
-            args.n_example_pred <= args.batch_size
+            training_cfg.n_example_pred <= data_cfg.batch_size
         ), "Can not plot more examples than batch size in GraphEFM"
-        self.sample_obs_noise = bool(args.sample_obs_noise)
-        self.ensemble_size = args.ensemble_size
-        self.kl_beta = args.kl_beta
-        self.crps_weight = args.crps_weight
+
+        # These specific args were not in the generic ARModel __init__ before,
+        # so they need to be sourced from cfg here.
+        # Assuming sample_obs_noise, ensemble_size, kl_beta, crps_weight are in training_cfg or model_cfg
+        # For example, if they are in training_cfg:
+        self.sample_obs_noise = bool(training_cfg.get("sample_obs_noise", False)) # Example default
+        self.ensemble_size = training_cfg.get("ensemble_size", 5) # Example default
+        self.kl_beta = training_cfg.get("kl_beta", 1.0) # Example default
+        self.crps_weight = training_cfg.get("crps_weight", 0.0) # Example default
+
 
         # Load graph with static features
-        self.hierarchical_graph, graph_ldict = utils.load_graph(args.graph)
+        # graph name from model_cfg
+        self.hierarchical_graph, graph_ldict = project_utils.load_graph(model_cfg.graph_name)
         for name, attr_value in graph_ldict.items():
             # Make BufferLists module members and register tensors as buffers
             if isinstance(attr_value, torch.Tensor):
@@ -47,16 +58,17 @@ class GraphEFM(ARModel):
 
         # Define sub-models
         # Feature embedders for grid
-        self.mlp_blueprint_end = [args.hidden_dim] * (args.hidden_layers + 1)
-        self.grid_prev_embedder = utils.make_mlp(
+        # hidden_dim and hidden_layers from model_cfg
+        self.mlp_blueprint_end = [model_cfg.hidden_dim] * (model_cfg.hidden_layers + 1)
+        self.grid_prev_embedder = project_utils.make_mlp(
             [self.grid_dim] + self.mlp_blueprint_end
         )  # For states up to t-1
-        self.grid_current_embedder = utils.make_mlp(
+        self.grid_current_embedder = project_utils.make_mlp(
             [grid_current_dim] + self.mlp_blueprint_end
         )  # For states including t
         # Embedders for mesh
-        self.g2m_embedder = utils.make_mlp([g2m_dim] + self.mlp_blueprint_end)
-        self.m2g_embedder = utils.make_mlp([m2g_dim] + self.mlp_blueprint_end)
+        self.g2m_embedder = project_utils.make_mlp([g2m_dim] + self.mlp_blueprint_end)
+        self.m2g_embedder = project_utils.make_mlp([m2g_dim] + self.mlp_blueprint_end)
         if self.hierarchical_graph:
             # Print some useful info
             print("Loaded hierarchical graph with structure:")
@@ -87,35 +99,36 @@ class GraphEFM(ARModel):
             # Separate mesh node embedders for each level
             self.mesh_embedders = torch.nn.ModuleList(
                 [
-                    utils.make_mlp([mesh_dim] + self.mlp_blueprint_end)
+                    project_utils.make_mlp([mesh_dim] + self.mlp_blueprint_end)
                     for _ in range(num_levels)
                 ]
             )
             self.mesh_up_embedders = torch.nn.ModuleList(
                 [
-                    utils.make_mlp([mesh_up_dim] + self.mlp_blueprint_end)
+                    project_utils.make_mlp([mesh_up_dim] + self.mlp_blueprint_end)
                     for _ in range(num_levels - 1)
                 ]
             )
             self.mesh_down_embedders = torch.nn.ModuleList(
                 [
-                    utils.make_mlp([mesh_down_dim] + self.mlp_blueprint_end)
+                    project_utils.make_mlp([mesh_down_dim] + self.mlp_blueprint_end)
                     for _ in range(num_levels - 1)
                 ]
             )
             # If not using any processor layers, no need to embed m2m
+            # Assuming these layer counts are in model_cfg
             self.embedd_m2m = (
                 max(
-                    args.prior_processor_layers,
-                    args.encoder_processor_layers,
-                    args.processor_layers,
+                    model_cfg.prior_processor_layers,
+                    model_cfg.encoder_processor_layers,
+                    model_cfg.processor_layers, # This was ARModel's processor_layers
                 )
                 > 0
             )
             if self.embedd_m2m:
                 self.m2m_embedders = torch.nn.ModuleList(
                     [
-                        utils.make_mlp([m2m_dim] + self.mlp_blueprint_end)
+                        project_utils.make_mlp([m2m_dim] + self.mlp_blueprint_end)
                         for _ in range(num_levels)
                     ]
                 )
@@ -129,48 +142,50 @@ class GraphEFM(ARModel):
                 f"{self.num_mesh_nodes} mesh)"
             )
             mesh_static_dim = self.mesh_static_features.shape[1]
-            self.mesh_embedder = utils.make_mlp(
+            self.mesh_embedder = project_utils.make_mlp(
                 [mesh_static_dim] + self.mlp_blueprint_end
             )
             m2m_dim = self.m2m_features.shape[1]
-            self.m2m_embedder = utils.make_mlp(
+            self.m2m_embedder = project_utils.make_mlp(
                 [m2m_dim] + self.mlp_blueprint_end
             )
 
+        # latent_dim, learn_prior, prior_dist from model_cfg
         latent_dim = (
-            args.latent_dim if args.latent_dim is not None else args.hidden_dim
+            model_cfg.latent_dim if model_cfg.latent_dim is not None else model_cfg.hidden_dim
         )
         # Prior
-        if args.learn_prior:
+        if model_cfg.learn_prior:
             if self.hierarchical_graph:
                 self.prior_model = HiGraphLatentEncoder(
                     latent_dim,
                     self.g2m_edge_index,
                     self.m2m_edge_index,
                     self.mesh_up_edge_index,
-                    args.hidden_dim,
-                    args.prior_processor_layers,
-                    hidden_layers=args.hidden_layers,
-                    output_dist=args.prior_dist,
+                    model_cfg.hidden_dim,
+                    model_cfg.prior_processor_layers,
+                    hidden_layers=model_cfg.hidden_layers,
+                    output_dist=model_cfg.prior_dist,
                 )
             else:
                 self.prior_model = GraphLatentEncoder(
                     latent_dim,
                     self.g2m_edge_index,
                     self.m2m_edge_index,
-                    args.hidden_dim,
-                    args.prior_processor_layers,
-                    hidden_layers=args.hidden_layers,
-                    output_dist=args.prior_dist,
+                    model_cfg.hidden_dim,
+                    model_cfg.prior_processor_layers,
+                    hidden_layers=model_cfg.hidden_layers,
+                    output_dist=model_cfg.prior_dist,
                 )
         else:
             self.prior_model = ConstantLatentEncoder(
                 latent_dim,
                 self.num_mesh_nodes,
-                output_dist=args.prior_dist,
+                output_dist=model_cfg.prior_dist,
             )
 
         # Enc. + Dec.
+        # output_std from model_cfg
         if self.hierarchical_graph:
             # Encoder
             self.encoder = HiGraphLatentEncoder(
@@ -178,10 +193,10 @@ class GraphEFM(ARModel):
                 self.g2m_edge_index,
                 self.m2m_edge_index,
                 self.mesh_up_edge_index,
-                args.hidden_dim,
-                args.encoder_processor_layers,
-                hidden_layers=args.hidden_layers,
-                output_dist="diagonal",
+                model_cfg.hidden_dim,
+                model_cfg.encoder_processor_layers,
+                hidden_layers=model_cfg.hidden_layers,
+                output_dist="diagonal", # Usually fixed for VI encoder
             )
             # Decoder
             self.decoder = HiGraphLatentDecoder(
@@ -190,11 +205,11 @@ class GraphEFM(ARModel):
                 self.m2g_edge_index,
                 self.mesh_up_edge_index,
                 self.mesh_down_edge_index,
-                args.hidden_dim,
+                model_cfg.hidden_dim,
                 latent_dim,
-                args.processor_layers,
-                hidden_layers=args.hidden_layers,
-                output_std=bool(args.output_std),
+                model_cfg.processor_layers, # This was ARModel's processor_layers
+                hidden_layers=model_cfg.hidden_layers,
+                output_std=bool(model_cfg.output_std),
             )
         else:
             # Encoder
@@ -202,21 +217,21 @@ class GraphEFM(ARModel):
                 latent_dim,
                 self.g2m_edge_index,
                 self.m2m_edge_index,
-                args.hidden_dim,
-                args.encoder_processor_layers,
-                hidden_layers=args.hidden_layers,
-                output_dist="diagonal",
+                model_cfg.hidden_dim,
+                model_cfg.encoder_processor_layers,
+                hidden_layers=model_cfg.hidden_layers,
+                output_dist="diagonal", # Usually fixed for VI encoder
             )
             # Decoder
             self.decoder = GraphLatentDecoder(
                 self.g2m_edge_index,
                 self.m2m_edge_index,
                 self.m2g_edge_index,
-                args.hidden_dim,
+                model_cfg.hidden_dim,
                 latent_dim,
-                args.processor_layers,
-                hidden_layers=args.hidden_layers,
-                output_std=bool(args.output_std),
+                model_cfg.processor_layers, # This was ARModel's processor_layers
+                hidden_layers=model_cfg.hidden_layers,
+                output_std=bool(model_cfg.output_std),
             )
 
         # Add lists for val and test errors of ensemble prediction

@@ -2,7 +2,7 @@
 import torch_geometric as pyg
 
 # First-party
-from neural_lam import utils
+from neural_lam.utils import utils as project_utils
 from neural_lam.interaction_net import InteractionNet
 from neural_lam.models.base_graph_model import BaseGraphModel
 
@@ -14,8 +14,8 @@ class GraphCast(BaseGraphModel):
     Keisler (2022) is almost identical.
     """
 
-    def __init__(self, args):
-        super().__init__(args)
+    def __init__(self, model_cfg, training_cfg, data_cfg): # Updated signature
+        super().__init__(model_cfg, training_cfg, data_cfg) # Pass cfgs to parent
 
         assert (
             not self.hierarchical
@@ -31,19 +31,20 @@ class GraphCast(BaseGraphModel):
 
         # Define sub-models
         # Feature embedders for mesh
-        self.mesh_embedder = utils.make_mlp([mesh_dim] + self.mlp_blueprint_end)
-        self.m2m_embedder = utils.make_mlp([m2m_dim] + self.mlp_blueprint_end)
+        self.mesh_embedder = project_utils.make_mlp([mesh_dim] + self.mlp_blueprint_end)
+        self.m2m_embedder = project_utils.make_mlp([m2m_dim] + self.mlp_blueprint_end)
 
         # GNNs
         # processor
+        # Parameters from model_cfg
         processor_nets = [
             InteractionNet(
                 self.m2m_edge_index,
-                args.hidden_dim,
-                hidden_layers=args.hidden_layers,
-                aggr=args.mesh_aggr,
+                model_cfg.hidden_dim,
+                hidden_layers=model_cfg.hidden_layers,
+                aggr=model_cfg.mesh_aggr,
             )
-            for _ in range(args.processor_layers)
+            for _ in range(model_cfg.processor_layers) # This was ARModel's processor_layers
         ]
         self.processor = pyg.nn.Sequential(
             "mesh_rep, edge_rep",

@@ -2,7 +2,7 @@
 from torch import nn
 
 # First-party
-from neural_lam import utils
+from neural_lam.utils import utils as project_utils
 from neural_lam.interaction_net import InteractionNet
 from neural_lam.models.base_graph_model import BaseGraphModel
 
@@ -12,8 +12,8 @@ class BaseHiGraphModel(BaseGraphModel):
     Base class for hierarchical graph models.
     """
 
-    def __init__(self, args):
-        super().__init__(args)
+    def __init__(self, model_cfg, training_cfg, data_cfg): # Updated signature
+        super().__init__(model_cfg, training_cfg, data_cfg) # Pass cfgs to parent
 
         # Track number of nodes, edges on each level
         # Flatten lists for efficient embedding
@@ -48,25 +48,25 @@ class BaseHiGraphModel(BaseGraphModel):
         # Separate mesh node embedders for each level
         self.mesh_embedders = nn.ModuleList(
             [
-                utils.make_mlp([mesh_dim] + self.mlp_blueprint_end)
+                project_utils.make_mlp([mesh_dim] + self.mlp_blueprint_end)
                 for _ in range(self.num_levels)
             ]
         )
         self.mesh_same_embedders = nn.ModuleList(
             [
-                utils.make_mlp([mesh_same_dim] + self.mlp_blueprint_end)
+                project_utils.make_mlp([mesh_same_dim] + self.mlp_blueprint_end)
                 for _ in range(self.num_levels)
             ]
         )
         self.mesh_up_embedders = nn.ModuleList(
             [
-                utils.make_mlp([mesh_up_dim] + self.mlp_blueprint_end)
+                project_utils.make_mlp([mesh_up_dim] + self.mlp_blueprint_end)
                 for _ in range(self.num_levels - 1)
             ]
         )
         self.mesh_down_embedders = nn.ModuleList(
             [
-                utils.make_mlp([mesh_down_dim] + self.mlp_blueprint_end)
+                project_utils.make_mlp([mesh_down_dim] + self.mlp_blueprint_end)
                 for _ in range(self.num_levels - 1)
             ]
         )
@@ -77,8 +77,8 @@ class BaseHiGraphModel(BaseGraphModel):
             [
                 InteractionNet(
                     edge_index,
-                    args.hidden_dim,
-                    hidden_layers=args.hidden_layers,
+                    model_cfg.hidden_dim, # from model_cfg
+                    hidden_layers=model_cfg.hidden_layers, # from model_cfg
                 )
                 for edge_index in self.mesh_up_edge_index
             ]
@@ -89,8 +89,8 @@ class BaseHiGraphModel(BaseGraphModel):
             [
                 InteractionNet(
                     edge_index,
-                    args.hidden_dim,
-                    hidden_layers=args.hidden_layers,
+                    model_cfg.hidden_dim, # from model_cfg
+                    hidden_layers=model_cfg.hidden_layers, # from model_cfg
                     update_edges=False,
                 )
                 for edge_index in self.mesh_down_edge_index
