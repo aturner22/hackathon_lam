@@ -7,6 +7,7 @@ import numpy as np
 import pytorch_lightning as pl
 import torch
 import wandb
+import imageio
 
 # First-party
 from neural_lam import constants, metrics, utils, vis
@@ -92,6 +93,7 @@ class ARModel(pl.LightningModule):
 
         # For storing spatial loss maps during evaluation
         self.spatial_loss_maps = []
+        self.spatial_raw_error_maps = []  # <-- add this line
 
     def configure_optimizers(self):
         opt = torch.optim.AdamW(
@@ -336,6 +338,10 @@ class ARModel(pl.LightningModule):
             log_spatial_losses = spatial_loss  # fallback: log all available
         self.spatial_loss_maps.append(log_spatial_losses)
         # (B, N_log, num_grid_nodes)
+        
+        # Compute per-variable, per-gridpoint raw error
+        raw_error = prediction - target  # (B, pred_steps, num_grid_nodes, d_f)
+        self.spatial_raw_error_maps.append(raw_error)
 
         # Plot example predictions (on rank 0 only)
         if (
@@ -579,7 +585,82 @@ class ARModel(pl.LightningModule):
             )
 
         self.spatial_loss_maps.clear()
+        
+        # Plot per-variable, per-gridpoint mean raw error maps
+        if hasattr(self, "spatial_raw_error_maps") and self.spatial_raw_error_maps:
+            raw_error_tensor = self.all_gather_cat(
+                torch.cat(self.spatial_raw_error_maps, dim=0)
+            )  # (N_test, pred_steps, num_grid_nodes, d_f)
 
+            mean_raw_error = raw_error_tensor.mean(dim=0)  # (pred_steps, num_grid_nodes, d_f)
+            # save mean raw error as .npy file
+            NP_SAVE_DIR = "output/error_maps/"
+            os.makedirs(NP_SAVE_DIR, exist_ok=True)
+            np.save(os.path.join(NP_SAVE_DIR, "mean_raw_error.npy"), mean_raw_error.cpu().numpy())
+
+            for t_i in range(mean_raw_error.shape[0]):  # pred_steps
+                for var_i in range(mean_raw_error.shape[2]):  # d_f
+                    error_map = mean_raw_error[t_i, :, var_i]  # (num_grid_nodes,)
+                    var_name = constants.PARAM_NAMES_SHORT[var_i]
+                    var_dir = os.path.join(wandb.run.dir, f"{var_name}_raw_error")
+                    os.makedirs(var_dir, exist_ok=True)
+                    fig = vis.plot_spatial_error(
+                        error_map,
+                        self.interior_mask[:, 0],
+                        title=f"{var_name} raw error, t={t_i+1} ({self.step_length*(t_i+1)} h)",
+                    )
+                    # fig.savefig(os.path.join(var_dir, f"raw_error_t{t_i+1}.pdf"))
+                    fig.savefig(os.path.join(var_dir, f"raw_error_t{t_i+1}.png"))
+                    plt.close(fig)
+
+            self.spatial_raw_error_maps.clear()
+            for var_i in range(mean_raw_error.shape[2]):  # d_f
+                var_name = constants.PARAM_NAMES_SHORT[var_i]
+                var_dir = os.path.join(wandb.run.dir, f"{var_name}_raw_error")
+                png_files = [
+                    os.path.join(var_dir, f"raw_error_t{t_i+1}.png")
+                    for t_i in range(mean_raw_error.shape[0])
+                ]
+                images = [imageio.imread(png) for png in png_files if os.path.exists(png)]
+                if images:
+                    gif_path = os.path.join(var_dir, f"{var_name}_raw_error.gif")
+                    imageio.mimsave(gif_path, images, duration=0.8)  # duration in seconds per frame
+
+
+            # if os.path.exists("output/error_maps/baseline_prediction_raw_error.npy"):
+            #     baseline_raw_error = np.load("output/error_maps/baseline_prediction_raw_error.npy")
+                
+            #     diff = mean_raw_error.cpu().numpy() - baseline_raw_error
+            #     diff = torch.from_numpy(diff)  # (pred_steps, num_grid_nodes, d_f)
+
+            #     for t_i in range(diff.shape[0]):  # pred_steps
+            #         for var_i in range(diff.shape[2]):  # d_f
+            #             error_map = diff[t_i, :, var_i]  # (num_grid_nodes,)
+            #             var_name = constants.PARAM_NAMES_SHORT[var_i]
+            #             var_dir = os.path.join(wandb.run.dir, f"{var_name}_raw_error_to_pred")
+            #             os.makedirs(var_dir, exist_ok=True)
+            #             fig = vis.plot_spatial_error(
+            #                 error_map,
+            #                 self.interior_mask[:, 0],
+            #                 title=f"{var_name} raw error, t={t_i+1} ({self.step_length*(t_i+1)} h)",
+            #             )
+            #             # fig.savefig(os.path.join(var_dir, f"raw_error_t{t_i+1}.pdf"))
+            #             fig.savefig(os.path.join(var_dir, f"raw_error_t{t_i+1}.png"))
+            #             plt.close(fig)
+
+            #     self.spatial_raw_error_maps.clear()
+            #     for var_i in range(diff.shape[2]):  # d_f
+            #         var_name = constants.PARAM_NAMES_SHORT[var_i]
+            #         var_dir = os.path.join(wandb.run.dir, f"{var_name}_raw_error_to_pred")
+            #         png_files = [
+            #             os.path.join(var_dir, f"raw_error_t{t_i+1}.png")
+            #             for t_i in range(diff.shape[0])
+            #         ]
+            #         images = [imageio.imread(png) for png in png_files if os.path.exists(png)]
+            #         if images:
+            #             gif_path = os.path.join(var_dir, f"{var_name}_raw_error.gif")
+            #             imageio.mimsave(gif_path, images, duration=0.8)
+            
     def on_load_checkpoint(self, checkpoint):
         """
         Perform any changes to state dict before loading checkpoint

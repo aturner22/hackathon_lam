@@ -10,4 +10,4 @@ python train_model.py\
     --batch_size 1\
     --load paper_checkpoints/graphcast.ckpt\
     --eval test\
-    --pred_steps 5\
+    --pred_steps 19\

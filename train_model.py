@@ -34,9 +34,9 @@ def main():
     parser.add_argument(
         "--dataset",
         type=str,
-        default="meps_example",
+        default="meps_online",
         help="Dataset, corresponding to name in data directory "
-        "(default: meps_example)",
+        "(default: meps_online)",
     )
     parser.add_argument(
         "--model",
